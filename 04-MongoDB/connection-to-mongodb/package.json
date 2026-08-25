@@ -1,0 +1,23 @@
+{
+	"name": "wbs-node-ts-template",
+	"version": "1.0.0",
+	"description": "",
+	"keywords": [],
+	"license": "ISC",
+	"author": "",
+	"type": "module",
+	"main": "dist/app.js",
+	"imports": {
+		"#db": "./src/db/index.ts"
+	},
+	"scripts": {
+		"start": "node --env-file=.env src/app.ts"
+	},
+	"devDependencies": {
+		"@types/node": "^24.13.3",
+		"typescript": "^7.0.2"
+	},
+	"dependencies": {
+		"mongodb": "^7.6.0"
+	}
+}
