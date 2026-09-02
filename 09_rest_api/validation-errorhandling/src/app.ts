@@ -1,4 +1,4 @@
-import express, { type RequestHandler } from 'express';
+import express from 'express';
 import '#db';
 import { postRouter, userRouter } from '#routes';
 import { errorHandler } from '#middlewares';

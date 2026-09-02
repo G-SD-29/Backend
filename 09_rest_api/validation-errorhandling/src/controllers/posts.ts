@@ -1,24 +1,30 @@
 import { type RequestHandler } from 'express';
-import { Post } from '#models';
-import { type PostType } from '#types';
+import { Post, User } from '#models';
+import type { blogPostInputSchema, blogPostSchema } from '#schemas';
+import { z } from 'zod/v4';
 
-export const getPosts: RequestHandler = async (req, res) => {
+type BlogPostDTO = z.infer<typeof blogPostSchema>;
+type BlogPostInputDTO = z.infer<typeof blogPostInputSchema>;
+
+export const getPosts: RequestHandler<unknown, BlogPostDTO[]> = async (req, res) => {
   const posts = await Post.find().populate('userId', 'firstName lastName email').lean();
 
   res.json(posts);
 };
 
-export const createPost: RequestHandler = async (req, res) => {
-  const { title, content, userId } = req.body as PostType;
-  if (!title || !content || !userId) throw new Error('title, content and userId are required', { cause: 400 });
+export const createPost: RequestHandler<unknown, BlogPostDTO, BlogPostInputDTO> = async (req, res) => {
+  const { title, content, userId } = req.body;
 
-  const post = await Post.create<PostType>({ title, content, userId });
+  const user = await User.findById(userId);
+  if (!user) throw new Error('User not found', { cause: 404 });
+
+  const post = await Post.create<BlogPostInputDTO>({ title, content, userId });
 
   const populatedPost = await post.populate('userId', 'firstName lastName email');
   res.json(populatedPost);
 };
 
-export const getPostById: RequestHandler = async (req, res) => {
+export const getPostById: RequestHandler<{ id: string }> = async (req, res) => {
   const {
     params: { id }
   } = req;
@@ -28,13 +34,11 @@ export const getPostById: RequestHandler = async (req, res) => {
   res.json(post);
 };
 
-export const updatePost: RequestHandler = async (req, res) => {
+export const updatePost: RequestHandler<{ id: string }, BlogPostDTO, BlogPostInputDTO> = async (req, res) => {
   const {
     body: { title, content, userId },
     params: { id }
   } = req;
-
-  if (!title || !content || !userId) throw new Error('title, content and userId are required', { cause: 400 });
 
   const post = await Post.findById(id);
   if (!post) throw new Error('Post not found', { cause: 404 });
@@ -48,7 +52,7 @@ export const updatePost: RequestHandler = async (req, res) => {
   res.json(populatedPost);
 };
 
-export const deletePost: RequestHandler = async (req, res) => {
+export const deletePost: RequestHandler<{ id: string }> = async (req, res) => {
   const {
     params: { id }
   } = req;
