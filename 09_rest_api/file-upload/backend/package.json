@@ -1,0 +1,58 @@
+{
+  "name": "file-upload",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.ts",
+  "imports": {
+    "#controllers": {
+      "development": "./src/controllers/index.ts",
+      "default": "./dist/controllers/index.js"
+    },
+    "#middleware": {
+      "development": "./src/middleware/index.ts",
+      "default": "./dist/middleware/index.js"
+    },
+    "#models": {
+      "development": "./src/models/index.ts",
+      "default": "./dist/models/index.js"
+    },
+    "#routes": {
+      "development": "./src/routes/index.ts",
+      "default": "./dist/routes/index.js"
+    },
+    "#schemas": {
+      "development": "./src/schemas/index.ts",
+      "default": "./dist/schemas/index.js"
+    },
+    "#db": {
+      "development": "./src/db/index.ts",
+      "default": "./dist/db/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "node --watch --conditions development --env-file=.env.development.local src/app.ts",
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "prestart": "npm run build",
+    "start": "node --env-file=.env.production.local dist/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "formidable": "^3.5.4",
+    "mongoose": "^9.2.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/formidable": "^3.5.1",
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3"
+  }
+}
