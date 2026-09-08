@@ -4,6 +4,7 @@ import '#db';
 import { errorHandler, notFoundHandler } from '#middleware';
 import { postRoutes, authRoutes } from '#routes';
 import { PORT, CLIENT_BASE_URL } from '#config';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser());
 
 app.use('/posts', postRoutes);
 app.use('/auth', authRoutes);

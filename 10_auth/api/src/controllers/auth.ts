@@ -1,7 +1,37 @@
 import type { RequestHandler } from 'express';
 import { ACCESS_JWT_SECRET, REFRESH_TOKEN_TTL, SALT_ROUNDS } from '#config';
+import User from '../models/User.ts';
+import bcrypt from 'bcrypt';
+import { createToken } from '../utils/index.ts';
 
 export const register: RequestHandler = async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
+
+  const userExists = await User.exists({ email });
+
+  if (userExists) {
+    throw new Error('User already exists', { cause: { status: 409 } });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+  const newUser = await User.create({
+    ...req.body,
+    password: hashedPassword
+  });
+
+  const { password: _, ...data } = newUser.toObject();
+
+  const accessToken = createToken(data);
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none' as const
+  });
+
+  res.json({ user: data });
+
   // TODO: Implement user registration
   // Query the DB for an existing user with that email
   // Throw an error if a user with that email if found
@@ -9,10 +39,33 @@ export const register: RequestHandler = async (req, res) => {
   // Save the user to the database with the hashed password
   // Generate access token (JWT) and refresh token (random string saved to database)
   // Send the access token (in the response body) and the refresh token (in a cookie)
-  res.json({ message: 'POST /register', body: req.body });
 };
 
 export const login: RequestHandler = async (req, res) => {
+  const { password, email } = req.body;
+
+  const user = await User.findOne({ email }).select('+password');
+
+  if (!user) {
+    throw new Error('Invalid Credentials', { cause: { status: 401 } });
+  }
+
+  const match = bcrypt.compare(password, user.password);
+
+  if (!match) {
+    throw new Error('Invalid credentials', { cause: { status: 401 } });
+  }
+
+  const { password: _, ...data } = user.toObject();
+
+  const accessToken = createToken(data);
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none' as const
+  });
+
+  res.json({ user: data });
   // TODO: Implement user login
   //   Query the DB for an existing user with that email (make sure to .select('+password') so we can compare it to the hashed password)
   // Throw an error is a user with that email is NOT found
@@ -21,7 +74,6 @@ export const login: RequestHandler = async (req, res) => {
   // Delete all refresh tokens from that user
   // Generate access token (JWT) and refresh token (random string saved to database)
   // Send the access token (in the response body) and the refresh token (in a cookie)
-  res.json({ message: 'POST /login', body: req.body });
 };
 
 export const refresh: RequestHandler = async (req, res) => {
@@ -39,12 +91,13 @@ export const refresh: RequestHandler = async (req, res) => {
 };
 
 export const logout: RequestHandler = async (req, res) => {
+  res.clearCookie('accessToken');
+  res.json({ message: 'Logged out' });
   // TODO: Implement logout by removing the tokens
   //   Get the refreshToken cookie
   // If a refreshToken cookie is found, delete the corresponding stored token from the database
   // Clear the refreshToken cookie
   // Send a success message in the response body
-  res.json({ message: 'DELETE /refresh' });
 };
 
 export const me: RequestHandler = async (req, res, next) => {
