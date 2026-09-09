@@ -2,7 +2,8 @@ import type { RequestHandler } from 'express';
 import { ACCESS_JWT_SECRET, REFRESH_TOKEN_TTL, SALT_ROUNDS } from '#config';
 import User from '../models/User.ts';
 import bcrypt from 'bcrypt';
-import { createToken } from '../utils/index.ts';
+import { createRefreshToken, createToken } from '../utils/index.ts';
+import RefreshToken from '../models/RefreshToken.ts';
 
 export const register: RequestHandler = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
@@ -23,11 +24,19 @@ export const register: RequestHandler = async (req, res) => {
   const { password: _, ...data } = newUser.toObject();
 
   const accessToken = createToken(data);
+  const refreshToken = await createRefreshToken(newUser._id);
 
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'none' as const
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_TTL * 100
   });
 
   res.json({ user: data });
@@ -59,10 +68,19 @@ export const login: RequestHandler = async (req, res) => {
   const { password: _, ...data } = user.toObject();
 
   const accessToken = createToken(data);
+  const refreshToken = await createRefreshToken(user._id);
+
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'none' as const
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_TTL * 100
   });
 
   res.json({ user: data });
@@ -77,6 +95,42 @@ export const login: RequestHandler = async (req, res) => {
 };
 
 export const refresh: RequestHandler = async (req, res) => {
+  const { refreshToken } = req.cookies;
+
+  if (!refreshToken) {
+    throw new Error('Refresh token is required', { cause: { status: 401 } });
+  }
+
+  const storedToken = await RefreshToken.findOne({ token: refreshToken });
+
+  if (!storedToken) {
+    throw new Error('Refresh token not found', { cause: { status: 401 } });
+  }
+
+  await RefreshToken.findByIdAndDelete(storedToken._id);
+
+  const user = await User.findById(storedToken.userId);
+  if (!user) throw new Error('User not found', { cause: { status: 404 } });
+
+  const { password: _, ...data } = user.toObject();
+
+  const accessToken = createToken(data);
+  const newRefreshToken = await createRefreshToken(user._id);
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none' as const
+  });
+
+  res.cookie('refreshToken', newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_TTL * 100
+  });
+
+  res.status(200).json({ message: 'Refreshed' });
   // TODO: Implement access token refresh and refresh token rotation
   // Destructure the refreshToken from req.cookies
   // Throw an error if there is no refreshToken cookie
@@ -87,10 +141,16 @@ export const refresh: RequestHandler = async (req, res) => {
   // Throw an error if no user is found
   // Generate access token (JWT) and refresh token (random string saved to database)
   // Send the access token (in the response body) and the refresh token (in a cookie)
-  res.json({ message: 'POST /refresh' });
 };
 
 export const logout: RequestHandler = async (req, res) => {
+  const { refreshToken } = req.cookies;
+
+  if (refreshToken) {
+    await RefreshToken.findOneAndDelete({ token: refreshToken });
+  }
+
+  res.clearCookie('refreshToken');
   res.clearCookie('accessToken');
   res.json({ message: 'Logged out' });
   // TODO: Implement logout by removing the tokens

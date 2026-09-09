@@ -1,19 +1,31 @@
 import { type ErrorRequestHandler } from 'express';
 
+type ErrorPayLoad = {
+  message: string;
+  code?: string;
+};
+
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   process.env.NODE_ENV !== 'production' && console.log(`\x1b[31m${err.stack}\x1b[0m`);
 
-  let errorMessage = 'Internal server error';
-  let statusCode = 500;
-
   if (err instanceof Error) {
-    // check if cause property exists, is an object, and has a 'status' property
-    if (err.cause && typeof err.cause === 'object' && 'status' in err.cause) {
-      statusCode = err.cause.status as number;
+    const payload: ErrorPayLoad = { message: err.message };
+
+    if (err.cause) {
+      const cause = err.cause as { status: number; code?: string };
+
+      if (cause.code === 'ACCESS_TOKEN_EXPIRED') {
+        console.log('access token expired');
+        res.setHeader('WWW-Authenticate', 'Bearer error="token expired", error_description="The access token expired"');
+        res.status(cause.status ?? 500).json(payload);
+        return;
+      }
     }
-    errorMessage = err.message;
+    res.status(500).json(payload);
+    return;
   }
-  res.status(statusCode).json({ error: errorMessage });
+  res.status(500).json({ message: 'Interal server error' });
+  return;
 };
 
 export default errorHandler;

@@ -17,6 +17,10 @@ const authenticate: RequestHandler = (req, res, next) => {
       roles: decoded.roles
     };
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return next(new Error('Expired access token', { cause: { status: 401 }, code: 'ACCESS_TOKEN_EXPIRED' }));
+    }
+
     throw new Error('Not authorized', { cause: { status: 401 } });
   }
 
