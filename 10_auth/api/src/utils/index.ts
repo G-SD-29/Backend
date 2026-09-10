@@ -12,7 +12,7 @@ type UserData = {
 export const createToken = (userData: UserData) => {
   console.log(userData);
   const token = jwt.sign({ id: userData._id, roles: userData.roles }, ACCESS_JWT_SECRET, {
-    expiresIn: '5s'
+    expiresIn: '15min'
   });
 
   return token;
@@ -20,8 +20,8 @@ export const createToken = (userData: UserData) => {
 
 export async function createRefreshToken(id: Types.ObjectId) {
   const refreshTokenString = crypto.randomBytes(25).toString('hex');
-  console.log(refreshTokenString);
 
-  await RefreshToken.create({ token: refreshTokenString, userId: id });
+  const insertedToken = await RefreshToken.create({ token: refreshTokenString, userId: id });
+  console.log('inserted', insertedToken);
   return refreshTokenString;
 }

@@ -1,8 +1,9 @@
 import { ACCESS_JWT_SECRET } from '#config';
 import type { RequestHandler } from 'express';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
+import User from '../models/User.ts';
 
-const authenticate: RequestHandler = (req, res, next) => {
+const authenticate: RequestHandler = async (req, res, next) => {
   const { accessToken } = req.cookies;
 
   if (!accessToken) {
@@ -12,13 +13,16 @@ const authenticate: RequestHandler = (req, res, next) => {
   try {
     const decoded = jwt.verify(accessToken, ACCESS_JWT_SECRET) as JwtPayload;
 
-    req.user = {
-      id: decoded.id,
-      roles: decoded.roles
-    };
+    // req.user = {
+    //   id: decoded.id,
+    //   roles: decoded.roles
+    // };
+
+    const user = await User.findById(decoded.id).lean();
+    req.user = user;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      return next(new Error('Expired access token', { cause: { status: 401 }, code: 'ACCESS_TOKEN_EXPIRED' }));
+      return next(new Error('Expired access token', { cause: { status: 401, code: 'ACCESS_TOKEN_EXPIRED' } }));
     }
 
     throw new Error('Not authorized', { cause: { status: 401 } });

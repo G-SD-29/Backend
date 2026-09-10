@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-	VITE_APP_TRAVEL_JOURNAL_API_URL: z.url().default('http://localhost:8000'),
+	VITE_APP_TRAVEL_JOURNAL_API_URL: z.url().default('http://localhost:3000'),
 });
 
 const parsedEnv = envSchema.safeParse(import.meta.env);

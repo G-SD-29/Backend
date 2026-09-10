@@ -10,9 +10,9 @@ const app = express();
 
 app.use(
   cors({
-    origin: CLIENT_BASE_URL, // for use with credentials, origin(s) need to be specified
-    credentials: true, // sends and receives secure cookies
-    exposedHeaders: ['WWW-Authenticate'] // needed to send the 'refresh trigger''
+    origin: 'http://localhost:5173',
+    credentials: true,
+    exposedHeaders: ['WWW-Authenticate']
   })
 );
 app.use(express.json());

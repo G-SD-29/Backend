@@ -40,14 +40,6 @@ export const register: RequestHandler = async (req, res) => {
   });
 
   res.json({ user: data });
-
-  // TODO: Implement user registration
-  // Query the DB for an existing user with that email
-  // Throw an error if a user with that email if found
-  // Salt and hash the user's password
-  // Save the user to the database with the hashed password
-  // Generate access token (JWT) and refresh token (random string saved to database)
-  // Send the access token (in the response body) and the refresh token (in a cookie)
 };
 
 export const login: RequestHandler = async (req, res) => {
@@ -84,14 +76,6 @@ export const login: RequestHandler = async (req, res) => {
   });
 
   res.json({ user: data });
-  // TODO: Implement user login
-  //   Query the DB for an existing user with that email (make sure to .select('+password') so we can compare it to the hashed password)
-  // Throw an error is a user with that email is NOT found
-  // Compare the hashed password to the password the user provided
-  // Throw an error if the passwords don't match
-  // Delete all refresh tokens from that user
-  // Generate access token (JWT) and refresh token (random string saved to database)
-  // Send the access token (in the response body) and the refresh token (in a cookie)
 };
 
 export const refresh: RequestHandler = async (req, res) => {
@@ -107,8 +91,6 @@ export const refresh: RequestHandler = async (req, res) => {
     throw new Error('Refresh token not found', { cause: { status: 401 } });
   }
 
-  await RefreshToken.findByIdAndDelete(storedToken._id);
-
   const user = await User.findById(storedToken.userId);
   if (!user) throw new Error('User not found', { cause: { status: 404 } });
 
@@ -117,6 +99,8 @@ export const refresh: RequestHandler = async (req, res) => {
   const accessToken = createToken(data);
   const newRefreshToken = await createRefreshToken(user._id);
 
+  console.log('stored', storedToken);
+  const deleted = await RefreshToken.findByIdAndDelete(storedToken._id);
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: true,
@@ -131,16 +115,6 @@ export const refresh: RequestHandler = async (req, res) => {
   });
 
   res.status(200).json({ message: 'Refreshed' });
-  // TODO: Implement access token refresh and refresh token rotation
-  // Destructure the refreshToken from req.cookies
-  // Throw an error if there is no refreshToken cookie
-  // Query the database for the matching stored refresh token
-  // Throw an error if no stored token was found
-  // Delete the stored token (since we'll be rotating it with a new refresh token)
-  // Query the database for the user associated with that token
-  // Throw an error if no user is found
-  // Generate access token (JWT) and refresh token (random string saved to database)
-  // Send the access token (in the response body) and the refresh token (in a cookie)
 };
 
 export const logout: RequestHandler = async (req, res) => {
@@ -153,23 +127,8 @@ export const logout: RequestHandler = async (req, res) => {
   res.clearCookie('refreshToken');
   res.clearCookie('accessToken');
   res.json({ message: 'Logged out' });
-  // TODO: Implement logout by removing the tokens
-  //   Get the refreshToken cookie
-  // If a refreshToken cookie is found, delete the corresponding stored token from the database
-  // Clear the refreshToken cookie
-  // Send a success message in the response body
 };
 
 export const me: RequestHandler = async (req, res, next) => {
-  // TODO: Implement a me handler
-  // Get the access token from the request headers
-  // Get the Authorization header from the request
-  // Isolate the access token
-  // Throw an error if there is not access token
-  // Verify the access token
-  // If token is expired, add code: ACCESS_TOKEN_EXPIRED to error
-  // Query the database for the user who is the sub of the access token
-  // Throw an error if no user is found
-  // Send user profile with success message in response body
-  res.json({ message: 'GET /me' });
+  res.json({ user: req.user });
 };

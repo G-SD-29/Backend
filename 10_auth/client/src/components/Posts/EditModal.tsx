@@ -20,19 +20,19 @@ const EditModal = ({
 	image,
 	title,
 	author,
-	setPost
+	setPost,
 }: EditModalProps) => {
 	const [{ newTitle, newAuthor, newImage, newContent }, setForm] = useState({
 		newTitle: title,
 		newAuthor: author,
 		newImage: image,
-		newContent: content
+		newContent: content,
 	});
 	const [isConfirmed, setIsConfirmed] = useState(false);
 	const [loading, setLoading] = useState(false);
 
 	const handleChange = (
-		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
 	) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
 	const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -46,7 +46,7 @@ const EditModal = ({
 				title: newTitle,
 				author: newAuthor,
 				image: newImage,
-				content: newContent
+				content: newContent,
 			});
 			setPost(updatedPost);
 		} catch (error) {

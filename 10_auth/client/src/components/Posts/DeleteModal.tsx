@@ -64,7 +64,9 @@ const DeleteModal = ({ deleteModalRef, _id }: DeleteModalProps) => {
 							onChange={handleChange}
 						/>
 						<div className='label'>
-							<span className='label-text-alt'>Type DELETE to confirm</span>
+							<span className='label-text-alt'>
+								Type DELETE to confirm
+							</span>
 						</div>
 					</label>
 					<button

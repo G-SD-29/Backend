@@ -18,3 +18,13 @@ export type DbPost = DbEntry & PostInput;
 export type SetPost = Dispatch<SetStateAction<DbPost | null>>;
 
 export type ModalRef = RefObject<HTMLDialogElement | null>;
+
+declare global {
+	type User = {
+		email: string;
+		firstName: string;
+		lastName: string;
+		roles?: string[];
+		id?: string;
+	};
+}
