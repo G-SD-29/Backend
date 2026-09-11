@@ -1,10 +1,3 @@
-// fetch post create Post
-// response: token abgelaufen
-// fetch - refresh
-// response: neuer token
-// fetch post create Post
-//
-
 const originalFetch = window.fetch;
 
 const baseUrl = 'http://localhost:3000';

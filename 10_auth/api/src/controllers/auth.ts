@@ -111,7 +111,7 @@ export const refresh: RequestHandler = async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: REFRESH_TOKEN_TTL * 100
+    maxAge: REFRESH_TOKEN_TTL * 1000
   });
 
   res.status(200).json({ message: 'Refreshed' });

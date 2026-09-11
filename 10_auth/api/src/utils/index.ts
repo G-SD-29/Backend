@@ -12,7 +12,7 @@ type UserData = {
 export const createToken = (userData: UserData) => {
   console.log(userData);
   const token = jwt.sign({ id: userData._id, roles: userData.roles }, ACCESS_JWT_SECRET, {
-    expiresIn: '15min'
+    expiresIn: '1s'
   });
 
   return token;
