@@ -1,18 +1,22 @@
-import { useState, type SubmitEvent } from 'react';
+import type { SubmitEvent } from 'react';
+import { useState } from 'react';
 import './App.css';
+
+type Message = { role: 'user' | 'assistant'; content: string };
 
 function App() {
   const [pending, setPending] = useState(false);
 
   const [prompt, setPrompt] = useState('');
   const [chatId, setChatId] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     try {
       setPending(true);
+      // TODO: Post prompts
     } catch (error) {
       console.error('Error ', error);
     } finally {
@@ -46,7 +50,7 @@ function App() {
       </form>
       <div className='mockup-window border w-full my-4 flex-1 overflow-y-auto text-start px-4 '>
         {messages.map((m, i) => (
-          <div key={i} className='chat '>
+          <div key={i} className='chat'>
             <div className='chat-bubble chat-bubble-primary whitespace-pre-wrap'>{m.content}</div>
           </div>
         ))}
