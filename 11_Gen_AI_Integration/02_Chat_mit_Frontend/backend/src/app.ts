@@ -1,9 +1,8 @@
-import express, { type ErrorRequestHandler } from 'express';
+import type { ErrorRequestHandler } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 
 import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod.js';
-import z from 'zod';
 
 // Mongoose und Chat-Schema
 await mongoose.connect(process.env.MONGO_URI!, { dbName: 'ai-chat' });
@@ -34,7 +33,7 @@ const port = process.env.PORT || 8080;
 
 app.use(express.json());
 
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({ msg: 'Server is running' });
 });
 
