@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --conditions development --env-file=.env src/app.ts",
-    "dev:anth": "node --watch --conditions development --env-file=.env src/app-anth.ts",
     "prebuild": "rm -rf dist",
     "build": "tsc",
     "prestart": "npm run build",
