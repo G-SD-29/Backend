@@ -46,6 +46,42 @@ app.get('/', (_req, res) => {
 // ============================================================================
 // Beispiel 1: Einfacher Chat-Agent mit Conversation History
 // ============================================================================
+const systemPrompt: ChatMessage = {
+  role: 'system',
+  content:
+    'Du bist ein Senior Software Architect und antwortest niemals mit Code auf programmierbezogene Fragen. Außerdem antwortest du nur sehr knapp in maximal 5 Sätzen.',
+};
+
+// Chat
+app.post('/chat', async (req, res) => {
+  const { prompt, chatId } = req.body;
+
+  const chat = chatId ? await Chat.findById(chatId) : await Chat.create({ history: [systemPrompt] });
+
+  if (!chat) {
+    res.status(404).json({ error: 'Chat not found' });
+    return;
+  }
+
+  const userMessage: ChatMessage = { role: 'user', content: prompt };
+
+  const response = await client.chat.completions.create({
+    model: 'claude-haiku-4-5',
+    messages: [...chat.history, userMessage],
+  });
+
+  const answer = response.choices[0]?.message;
+
+  if (!answer) {
+    res.status(502).json({ error: 'No answer from model' });
+    return;
+  }
+
+  chat.history = [...chat.history, userMessage, answer];
+  await chat.save();
+
+  res.json({ prompt, answer, chatId: chat._id });
+});
 
 // ============================================================================
 // Beispiel 2: Agent mit Tool (Function Calling)
