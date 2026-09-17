@@ -1,5 +1,15 @@
-import type { AgentInputItem } from '@openai/agents';
-import { Agent, resetCurrentSpan, run, setDefaultOpenAIClient, setOpenAIAPI, tool } from '@openai/agents';
+import type { AgentInputItem, InputGuardrail, OutputGuardrail } from '@openai/agents';
+import {
+  Agent,
+  handoff,
+  InputGuardrailTripwireTriggered,
+  OutputGuardrailTripwireTriggered,
+  resetCurrentSpan,
+  run,
+  setDefaultOpenAIClient,
+  setOpenAIAPI,
+  tool,
+} from '@openai/agents';
 import cors from 'cors';
 import type { ErrorRequestHandler } from 'express';
 import express from 'express';
@@ -193,6 +203,7 @@ const weatherTool = tool({
       results?: { latitude: number; longitude: number; timezone: string }[];
     };
     const place = coordData.results?.[0];
+
     if (!place) return `Location not found`;
 
     const weatherParams = new URLSearchParams({
@@ -225,6 +236,13 @@ const weatherAgent = new Agent({
   tools: [weatherTool],
 });
 
+// Kombiniert Chat mit History und Tool Calls
+// Dadurch kann der Agent Rückfragen stellen:
+//   Request 1: "Brauche ich einen Regenschirm?" → Es fehlt der Ort. Der Agent ruft kein Tool auf,
+// sondern fragt nach. Eine Antwort ohne Tool-Aufruf beendet run().
+//   Request 2: "Berlin" → Allein wäre das sinnlos. Weil die History aber die ursprüngliche Frage
+// und die Rückfrage enthält, versteht der Agent den Zusammenhang und ruft jetzt get_weather auf.
+// Ohne gespeicherte History könnte der Agent nur raten oder bei jedem Request neu fragen.
 app.post('/umbrella-or-not', async (req, res) => {
   const { prompt, chatId } = req.body;
   const chat = chatId ? await Chat.findById(chatId) : await Chat.create({ history: [] });
@@ -235,6 +253,8 @@ app.post('/umbrella-or-not', async (req, res) => {
 
   const result = await run(weatherAgent, chat.history.concat({ role: 'user', content: prompt }));
 
+  // Die History enthält jetzt nicht nur Chat-Nachrichten, sondern auch die Tool-Aufrufe und ihre Ergebnisse.
+  // Bei der nächsten Frage ("Und morgen?") kennt der Agent die Wetterdaten schon.
   chat.history = result.history;
   await chat.save();
 
@@ -245,11 +265,200 @@ app.post('/umbrella-or-not', async (req, res) => {
 // Beispiel 3: Multi-Agent System mit Handoffs
 // ============================================================================
 
+// Statt eines Agents, der alles kann, bauen wir mehrere spezialisierte Agents.
+// Ein Triage-Agent entscheidet nur, wer zuständig ist, und gibt das Gespräch dann ab ("Handoff").
+
+const customerSupportAgent = new Agent({
+  name: 'Customer Support Agent',
+  model: 'claude-sonnet-5',
+  instructions: `You are a customer support agent in a company that sells very fluffy pillows. Be friendly, helpful, and concise.`,
+});
+
+const escalationAgent = new Agent({
+  name: 'Escalation Control Agent',
+  model: 'claude-opus-4-8',
+  instructions: `You are an escalation control agent that handles negative customer interactions.
+  If the customer is upset, you will apologize and offer to escalate the issue to a manager.
+  Be friendly, helpful, reassuring and concise.`,
+});
+
+const triageAgent = new Agent({
+  name: 'Pillow Support Triage',
+  model: 'claude-haiku-4-5',
+  instructions: `NEVER answer non-pillow related questions and stop the conversation immediately. Do not handoff, when the topic is unrelated to our pillows.
+  If the question is about pillows, route it to the Customer Support Agent.
+  If the customer's tone is negative, route it to the Escalation Control Agent.`,
+  // Für das Modell sehen Handoffs genau wie Tools aus: Die SDK erzeugt für jeden Agent hier ein Tool
+  // mit dem Namen "transfer_to_<agent_name>", z.B. transfer_to_customer_support_agent.
+  // Ruft das Modell dieses Tool auf, übernimmt der andere Agent das Gespräch komplett:
+  // run() macht mit dessen Instructions und Modell weiter, und dieser Agent schreibt die finale Antwort.
+  // (Zum Vergleich: Mit agent.asTool() würde der Triage-Agent das Ergebnis zurückbekommen und selbst antworten.)
+  handoffs: [
+    // Die einfachste Form: Den Agent direkt eintragen.
+    customerSupportAgent,
+    // Mit handoff() können wir den Handoff genauer konfigurieren.
+    handoff(escalationAgent, {
+      // inputType funktioniert wie 'parameters' bei einem Tool: Das Modell muss beim Handoff
+      // Argumente mitschicken, hier einen Grund, warum eskaliert wird.
+      inputType: z.object({
+        reason: z.string(),
+      }),
+      // onHandoff läuft auf unserem Server, sobald der Handoff passiert – noch bevor der neue Agent antwortet.
+      // Das ist ein Side Effect: Hier könnten wir z.B. ein Ticket anlegen, eine Mail an einen Manager
+      // schicken oder den Vorfall in der Datenbank speichern. Das Modell bekommt davon nichts mit.
+      onHandoff(context, input) {
+        console.log(context);
+        console.log('Das war der Grund: ', input?.reason);
+      },
+    }),
+  ],
+});
+
+app.post('/pillow-support', async (req, res) => {
+  const { prompt } = req.body;
+
+  // Wir starten immer beim Triage-Agent. Welcher Agent am Ende geantwortet hat, entscheidet das Modell.
+  const result = await run(triageAgent, prompt);
+
+  res.json({ answer: result.finalOutput });
+});
+
 //
 // ============================================================================
 // Beispiel 4: Agent mit input/output-Validierung: Guardrails
 // ============================================================================
 
+// Guardrails sind Prüfungen, die die SDK automatisch um einen Agent herum ausführt:
+//   - Input Guardrails prüfen, was reinkommt (bevor die Antwort des Agents verwendet wird).
+//   - Output Guardrails prüfen, was der Agent zurückgibt.
+// Eine Guardrail gibt { tripwireTriggered, outputInfo } zurück. Ist tripwireTriggered true,
+// bricht run() ab und wirft einen Fehler, den wir im Endpunkt abfangen.
+// Guardrails sind normaler Code. Das Modell kann sie nicht umgehen, egal was im Prompt steht.
+
+// Dieses Schema nutzen wir doppelt: für die Guardrails und als strukturierten Output des Agents (siehe unten).
+const BoardSchema = z.object({
+  board: z.array(z.array(z.enum(['', 'X', 'O']))),
+});
+
+type Board = z.infer<typeof BoardSchema>['board'];
+
+const isThreeByThree = (board: Board) => board.length === 3 && board.every((row) => row.length === 3);
+
+// Input Guardrail: Hat der Client ein gültiges Spielfeld geschickt, auf dem X gerade gezogen hat?
+// Standardmäßig läuft sie parallel zum Agent (runInParallel: true). Das Modell wird also
+// trotzdem aufgerufen und kostet Tokens. Mit runInParallel: false wird der Agent erst nach der Prüfung starten.
+const validateClientMove: InputGuardrail = {
+  name: 'Client Move Validation',
+  runInParallel: false,
+  // 'input' ist das, was wir an run() übergeben haben – hier der JSON-String aus dem Endpunkt.
+  async execute({ input }) {
+    let tripwireTriggered = false;
+    let outputInfo = 'Valid client move';
+
+    try {
+      const parsed = JSON.parse(input as string);
+      const { board } = BoardSchema.parse(parsed); // Zod Validation
+      if (!isThreeByThree(board)) throw new Error('not a 3x3 board');
+
+      let countX = 0;
+      let countO = 0;
+
+      board.flat().forEach((cell) => {
+        if (cell === 'X') countX++;
+        if (cell === 'O') countO++;
+      });
+
+      // Der User spielt X und fängt an. Nach seinem Zug muss also genau ein X mehr auf dem Feld sein als O.
+      if (countX !== countO + 1) {
+        tripwireTriggered = true;
+        outputInfo = 'Invalid move: X must have exactly one more piece on the board than O.';
+      }
+    } catch {
+      tripwireTriggered = true;
+      outputInfo = 'Invalid move: Input could not be parsed or does not match the 3x3 board schema.';
+    }
+    console.log('Input Guardrail läuft');
+    return { tripwireTriggered, outputInfo };
+  },
+};
+
+// Output Guardrail: Hat der Agent einen gültigen Zug gemacht?
+// Der Typ-Parameter <typeof BoardSchema> sagt TypeScript, dass agentOutput die Form des Schemas hat.
+// Sie läuft, wenn der Agent fertig ist.
+const validAgentMoveGuardrail: OutputGuardrail<typeof BoardSchema> = {
+  name: 'Agent Move Validation',
+  // agentOutput ist bereits ein von Zod geprüftes Objekt, kein Text. Deshalb brauchen wir hier kein JSON.parse.
+  async execute({ agentOutput }) {
+    let tripwireTriggered = false;
+    let outputInfo = 'Valid agent move.';
+
+    const { board } = agentOutput;
+
+    if (!isThreeByThree(board)) {
+      return { tripwireTriggered: true, outputInfo: 'Invalid agent move: board is not 3x3.' };
+    }
+
+    let countX = 0;
+    let countO = 0;
+
+    board.flat().forEach((cell) => {
+      if (cell === 'X') countX++;
+      if (cell === 'O') countO++;
+    });
+
+    // Nach dem Zug des Agents (O) müssen X und O wieder gleich oft vorkommen.
+    if (countX !== countO) {
+      tripwireTriggered = true;
+      outputInfo = 'Invalid agent move.';
+    }
+    console.log('Output Guardrail läuft');
+    return { tripwireTriggered, outputInfo };
+  },
+};
+
+const ticTacToeAgent = new Agent({
+  name: 'Tic Tac Toe Player',
+  model: 'claude-haiku-4-5',
+  instructions: `You are an expert Tic-Tac-Toe player playing as 'O'.
+  You will receive a 3x3 board where the user has just played 'X'.
+  Make your next move by placing an 'O' in exactly one empty spot ("").
+  Do not change any existing 'X' or 'O's. Return the updated board.`,
+  // Strukturierter Output: Ohne outputType antwortet der Agent mit freiem Text.
+  // Mit outputType schickt die SDK das Schema als gewünschtes Antwortformat an das Modell,
+  // prüft die Antwort mit Zod und gibt uns in result.finalOutput ein fertiges Objekt { board: [...] } zurück.
+  // So können wir mit der Antwort im Code weiterrechnen, statt Text zu parsen.
+  outputType: BoardSchema,
+  // Hier hängen wir die Guardrails an den Agent. Es können jeweils mehrere sein.
+  outputGuardrails: [validAgentMoveGuardrail],
+  inputGuardrails: [validateClientMove],
+});
+
+app.post('/tic-tac-toe', async (req, res) => {
+  const { board } = req.body;
+  // Der Agent bekommt Text als Input, also wandeln wir das Spielfeld in einen JSON-String um.
+  const inputStr = JSON.stringify(board);
+
+  try {
+    const result = await run(ticTacToeAgent, inputStr);
+    // Dank outputType ist finalOutput ein Objekt und kein String.
+    res.json({ result: result.finalOutput });
+  } catch (error) {
+    // Schlägt eine Guardrail an, wirft run() einen eigenen Fehlertyp.
+    // Mit instanceof unterscheiden wir, welcher Fhler genau vorlag und können
+    // unterschiedlich fortfahren
+    // Ungültige Eingabe vom Client → 400, ungültiger Zug der KI → 500.
+    if (error instanceof OutputGuardrailTripwireTriggered) {
+      return res.status(500).json({ error: 'Die KI hat einen ungültigen Zug gemacht. Versuch es nochmal.' });
+    }
+    if (error instanceof InputGuardrailTripwireTriggered) {
+      return res.status(400).json({ error: error.message });
+    }
+    // alle anderen Fehler gehen an den globalen Errorhandler
+    throw error;
+  }
+});
+
+// ============================================================================
 app.use('/{*splat}', () => {
   throw Error('Page not found', { cause: { status: 404 } });
 });
