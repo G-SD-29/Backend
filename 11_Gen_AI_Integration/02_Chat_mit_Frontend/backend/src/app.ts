@@ -4,6 +4,8 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 
 import OpenAI from 'openai';
+import z from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod.js';
 
 // Mongoose und Chat-Schema
 await mongoose.connect(process.env.MONGO_URI!, { dbName: 'ai-chat' });
@@ -148,7 +150,6 @@ app.post('/chat/streaming', async (req, res) => {
     res.write(text);
   }
 
-
   // Erst jetzt, wo der Stream vorbei ist, kennen wir die ganze Antwort und speichern sie.
   chat.history = [...chat.history, userMessage, { role: 'assistant', content: answer }];
   await chat.save();
@@ -160,6 +161,37 @@ app.post('/chat/streaming', async (req, res) => {
 //
 // Strukturierter Output
 //
+
+const Recipe = z.object({
+  title: z.string(),
+  ingredients: z.array(
+    z.object({
+      name: z.string(),
+      quantity: z.number(),
+      unit: z.string(),
+      estimated_cost_per_unit: z.number().describe('The estimated cost of one unit in EUR cents'),
+    }),
+  ),
+  preparation_description: z.string(),
+  time_in_minutes: z.number(),
+});
+
+app.post('/recipes', async (req, res) => {
+  const { prompt } = req.body;
+
+  const response = await client.chat.completions.parse({
+    model: 'claude-haiku-4-5',
+    messages: [
+      { role: 'system', content: 'Du bist ein sehr kreativer Koch mit Vorliebe für Molekularküche' },
+      { role: 'user', content: prompt },
+    ],
+    response_format: zodResponseFormat(Recipe, 'recipe'),
+  });
+
+  const recipe = response.choices[0]?.message.parsed;
+
+  res.json({ recipe });
+});
 
 //
 // Express

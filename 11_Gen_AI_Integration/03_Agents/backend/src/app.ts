@@ -1,5 +1,5 @@
 import type { AgentInputItem } from '@openai/agents';
-import { Agent, run, setDefaultOpenAIClient, setOpenAIAPI, tool } from '@openai/agents';
+import { Agent, resetCurrentSpan, run, setDefaultOpenAIClient, setOpenAIAPI, tool } from '@openai/agents';
 import cors from 'cors';
 import type { ErrorRequestHandler } from 'express';
 import express from 'express';
@@ -145,6 +145,100 @@ app.post('/pokemon', async (req, res) => {
   const result = await run(orchestrationAgent, prompt);
 
   res.json({ result: result.finalOutput });
+});
+
+// ============================================================================
+// Übung: "Brauche ich gleich einen Regenschirm, wenn ich in Berlin rausgehe?"
+// ============================================================================
+
+// Diese Werte kennt die Open-Meteo API für stündliche Vorhersagen.
+// Mit z.enum() sieht das Modell im JSON Schema genau, welche Werte erlaubt sind, und kann keine erfinden.
+const weatherVariables = z.enum([
+  'temperature_2m',
+  'apparent_temperature',
+  'precipitation_probability',
+  'precipitation',
+  'weather_code',
+  'cloud_cover',
+  'wind_speed_10m',
+  'uv_index',
+]);
+
+const weatherTool = tool({
+  name: 'get_weather',
+  description: 'Get the hourly weather forecast for a location, starting at the current hour.',
+  parameters: z.object({
+    location: z.string().describe('Name of the city or location asked for.'),
+    variables: z
+      .array(weatherVariables)
+      .min(1)
+      .describe(
+        'Weather variables to fetch. Pick only what the question needs, e.g. precipitation_probability and precipitation for "Do I need an umbrella?".',
+      ),
+    // Alle Felder sind Pflicht: Im strict mode der Agents SDK sind optionale Felder nicht erlaubt.
+    forecast_hours: z
+      .number()
+      .int()
+      .min(1)
+      .max(168)
+      .describe('How many hours ahead to fetch, starting now. Use a small number like 3 for "right now" questions.'),
+  }),
+  async execute({ location, variables, forecast_hours }) {
+    console.log({ location, variables, forecast_hours });
+    // URLSearchParams kodiert Sonderzeichen und Leerzeichen, z.B. in "São Paulo".
+    const geoParams = new URLSearchParams({ name: location, count: '1', language: 'en', format: 'json' });
+    const coordsRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${geoParams}`);
+
+    const coordData = (await coordsRes.json()) as {
+      results?: { latitude: number; longitude: number; timezone: string }[];
+    };
+    const place = coordData.results?.[0];
+    if (!place) return `Location not found`;
+
+    const weatherParams = new URLSearchParams({
+      latitude: String(place.latitude),
+      longitude: String(place.longitude),
+      hourly: variables.join(','),
+      forecast_hours: String(forecast_hours),
+      timezone: place.timezone,
+    });
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?${weatherParams}`);
+    if (!weatherRes.ok) return `No weather data available`;
+    const weatherData = (await weatherRes.json()) as { hourly: object[] };
+
+    return `Current local time in ${location}: ${new Date().toLocaleString('en-US', { timeZone: place.timezone })}
+Forecast:
+${JSON.stringify(weatherData.hourly)}`;
+  },
+});
+
+const weatherAgent = new Agent({
+  name: 'Weather Agent',
+  model: 'claude-sonnet-5',
+  instructions: `You are a weather and fashion expert. You give guidance on how to dress depending on the current weather.
+  You have one tool:
+  - get_weather 
+
+  If the user did not mention a location, do NOT guess. Ask the user for their city and wait for the answer.
+
+  If you are asked about anything outside the scope of weather and dressing, reply shortly with "I only give guidance on how to dress depending on the weather. Can I help you with that?"`,
+  tools: [weatherTool],
+});
+
+app.post('/umbrella-or-not', async (req, res) => {
+  const { prompt, chatId } = req.body;
+  const chat = chatId ? await Chat.findById(chatId) : await Chat.create({ history: [] });
+  if (!chat) {
+    res.status(404).json({ error: 'Chat not found' });
+    return;
+  }
+
+  const result = await run(weatherAgent, chat.history.concat({ role: 'user', content: prompt }));
+
+  chat.history = result.history;
+  await chat.save();
+
+  res.json({ answer: result.finalOutput, chatId: chat._id });
 });
 
 // ============================================================================
