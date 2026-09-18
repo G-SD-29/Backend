@@ -192,4 +192,4 @@ serveStdio(createServer);
 console.error('Weather MCP server running on stdio');
 
 // Testen mit dem MCP Inspector:
-// npx @modelcontextprotocol/inspector node --conditions development src/example.ts
+// npx @modelcontextprotocol/inspector node --conditions development src/weather-mcp.ts
