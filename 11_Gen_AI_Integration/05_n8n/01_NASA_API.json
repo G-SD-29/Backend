@@ -1,0 +1,86 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.nasa",
+      "typeVersion": 1,
+      "position": [-352, 16],
+      "id": "0dde51c0-ff8e-4ecd-a835-3613a153feee",
+      "name": "Get the astronomy picture of the day",
+      "credentials": {
+        "nasaApi": {
+          "id": "Y8455k93dDdY6Oo7",
+          "name": "NASA account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "your@mail.com",
+        "toEmail": "other.mail@provider.com",
+        "subject": "Astronomy Pic of the Day",
+        "html": "={{ $json.explanation }}\n\n<img src=\"{{ $json.url }}\"/>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [-128, 16],
+      "id": "c9b306e8-9544-43eb-ab8a-8b9eda96056f",
+      "name": "Send an Email",
+      "webhookId": "928558ee-c192-47be-adf3-ee396183d6cb",
+      "credentials": {
+        "smtp": {
+          "id": "qCXDk03WbIuCv8LC",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [-576, 16],
+      "id": "eaa878df-e9df-43de-861b-cb427f889761",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "connections": {
+    "Get the astronomy picture of the day": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get the astronomy picture of the day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f4ed850c5b11492b9fdaa1b2b83e1415997348f2afa2331aad758add423d11af"
+  }
+}
