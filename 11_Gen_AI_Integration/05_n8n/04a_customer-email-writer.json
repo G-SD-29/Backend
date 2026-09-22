@@ -1,0 +1,172 @@
+{
+  "name": "customer-email-writer",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -192
+      ],
+      "id": "cdd10144-20c2-4c3f-b2eb-043f88da269b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "if (Math.random() < 0.5) {\n  return {id: Math.floor(Math.random()*100)}\n} else {\n  const mails = [\n  'lshaw53@example.com',\n  'rturner54@example.com',\n  'telliott55@example.com',\n  'dwebb56@example.com',\n  'hchase57@example.com',\n  'cross58@example.com',\n  'jnichols59@example.com',\n  'lpena60@example.com',\n  'mschmidt61@example.com',\n  'aobrien62@example.com',\n  'kcurtis63@example.com',\n  'sfrancis64@example.com',\n  'cmyers65@example.com',\n  'rflores66@example.com',\n  'jwalter67@example.com',\n  'lgraham68@example.com',\n  'mwheeler69@example.com',\n  'dhayes70@example.com',\n  'ncastillo71@example.com',\n  'cmitchell72@example.com',\n  'srodriguez73@example.com',\n  'bmarshall74@example.com',\n  'mstone75@example.com',\n  'fboyd76@example.com',\n  'jchavez77@example.com',\n  'dwallace78@example.com',\n  'rfisher79@example.com',\n  'jowens80@example.com',\n  'snewman81@example.com',\n  'pcarroll82@example.com',\n  'lford83@example.com',\n  'aharris84@example.com',\n  'vschultz85@example.com',\n  'tstevens86@example.com',\n  'dmontgomery87@example.com',\n  'hray88@example.com',\n  'cpena89@example.com',\n  'jporter90@example.com',\n  'vfranklin91@example.com',\n  'pmitchell92@example.com',\n  'jwatson93@example.com',\n  'mweaver94@example.com',\n  'rlong95@example.com',\n  'kwoods96@example.com',\n  'sjohnson97@example.com',\n  'glee98@example.com',\n  'hscott99@example.com',\n  'zadams100@example.com',\n];\nconst email = mails[ Math.floor(Math.random()*mails.length) ]\n  return {email}\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -192
+      ],
+      "id": "72feb810-e609-444c-aca1-784ae8d5374d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DEINE_WORKFLOW_ID",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/DEINE_WORKFLOW_ID",
+          "cachedResultName": "customer-service-lookup"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "email": "={{ $json.email }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        -192
+      ],
+      "id": "98e062d0-543b-405e-8ad7-05e93883de8c",
+      "name": "Call 'customer-service-lookup'"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Name:  {{ $json['First Name'] }} {{ $json['Last Name'] }}\nLocation: {{ $json.City }}\nFavorite Tacos: {{ $json['Favorite Tacos (comma separated)'] }}\nAllowed Discount Rate: {{ $json['Allowed Discount Rate'] }}",
+        "options": {
+          "systemMessage": "You are a professional email writer for \"Tacolicious.com\". You are given the name, location and favorite tacos from a registered customer. \nInform them about their allowed discounts at our place \"Tacolicious.com\"."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        400,
+        -192
+      ],
+      "id": "f1dfb8df-0512-4fac-abbd-c83b385779e4",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        472,
+        40
+      ],
+      "id": "84a38171-ab4a-4205-a3ee-7af5120cc738",
+      "name": "Anthropic Chat Model"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Call 'customer-service-lookup'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'customer-service-lookup'": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {},
+  "nodeGroups": [],
+  "tags": []
+}
