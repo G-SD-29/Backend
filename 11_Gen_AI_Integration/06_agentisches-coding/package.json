@@ -1,0 +1,38 @@
+{
+	"name": "books-api",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#db": "./src/db/index.ts",
+		"#model": "./src/model/index.ts",
+		"#schemas": "./src/schemas/index.ts",
+		"#controllers": "./src/controllers/index.ts",
+		"#routes": "./src/routes/index.ts",
+		"#middlewares": "./src/middlewares/index.ts",
+		"#utils": "./src/utils/index.ts"
+	},
+	"scripts": {
+		"dev": "node --watch --env-file=.env src/server.ts",
+		"start": "node --env-file=.env src/server.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"express": "^5.2.1",
+		"joi": "^18.2.9",
+		"mongoose": "^9.10.1"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.6",
+		"@types/node": "^26.6.2",
+		"@types/supertest": "^7.2.1",
+		"mongodb-memory-server": "^11.3.0",
+		"supertest": "^7.2.2",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.1"
+	},
+	"allowScripts": {
+		"mongodb-memory-server@11.3.0": true
+	}
+}
